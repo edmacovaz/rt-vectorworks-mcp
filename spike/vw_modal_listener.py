@@ -7,8 +7,8 @@ read-only ``vs.*`` call (the open document's filename).
 This is a throwaway feasibility probe, not the production listener. It is
 deliberately hardcoded and dependency-free (stdlib ``socket``/``select``/``json``
 + the in-VW ``vs`` module) — the MCP protocol layer is out of scope here and
-belongs to LAB-6 (which will build on FastMCP). See
-``docs/test-handoff-workflow.md`` for how to run it.
+belongs to LAB-6 (which will build on FastMCP). See ``spike/README.md`` for how
+to run it.
 
 How to run (Probe A):
   1. In VW 2026: Resource Manager (Cmd+R) -> New Resource -> Script ->
