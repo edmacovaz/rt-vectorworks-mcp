@@ -19,6 +19,9 @@ dist/
 .idea/
 *.swp
 
+# LAB-9 spike: machine-specific generated loader (path baked in per checkout)
+spike/persistent_probe/generated/
+
 # Local config / secrets
 .env
 launch.json
