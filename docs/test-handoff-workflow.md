@@ -1,129 +1,121 @@
-# Test-handoff workflow (macOS + VW 2026)
+# Test-handoff workflow (macOS + Vectorworks 2026)
 
-> **This is the durable deliverable of [LAB-9].** The dev machine has **no
-> Vectorworks installed**, so every end-to-end check runs on a separate
-> **macOS + Vectorworks 2026** machine. This README is the repeatable loop for
-> getting code onto that machine, running the stack over loopback, and carrying
-> the result back. Later E2E checks ([LAB-6], [LAB-8]) reuse it.
+> **This is the durable deliverable of [LAB-9].** The development machine has
+> **no Vectorworks installed**, so every end-to-end check has to run on a
+> separate Mac that has **Vectorworks 2026**. This is the step-by-step for
+> getting the code onto that Mac, running the checks, and reporting the result
+> back. Later checks ([LAB-6], [LAB-8]) reuse this same workflow.
 
-The topology is fixed: **single machine, loopback only.** The architect runs
-the entire stack on their own Vectorworks machine — this is the deployment
-model, not just a test rig, so there is never any cross-machine networking or
-auth in scope. The only cross-machine step is the *dev-time handoff of code*
-below, over git.
+Everything runs on that one Vectorworks Mac and only talks to itself — nothing
+is sent over the internet or to another computer. (This is also how each
+architect will eventually run the tool: entirely on their own machine.) The
+only step that moves between computers is copying the code across, covered
+below.
 
-Prior-art research this builds on: [`install-workflow.md`](install-workflow.md).
+Background research this builds on: [`install-workflow.md`](install-workflow.md).
 
-## Roles
+## Two roles
 
-- **Dev box** (this machine): authoring only. Writes code, pushes branches.
-  Cannot run Vectorworks.
-- **VW box**: a macOS machine with Vectorworks 2026. Downloads the branch, runs
-  the stack over loopback, reports results. **No GitHub account or git needed** —
-  a ZIP download is enough.
+- **The developer** writes the code and publishes it to GitHub. (Nothing to do
+  on the Vectorworks Mac for this part.)
+- **You, on the Vectorworks Mac** — download the code, run the two checks in
+  Vectorworks, and report what happened. **You don't need a GitHub account or
+  any git setup — a ZIP download is enough.**
 
-## The handoff loop
+## Getting the code onto the Vectorworks Mac
 
-1. **Push (dev box).** Commit and push the branch under test.
-   ```
-   git push -u origin <branch>
-   ```
-2. **Get the code onto the VW box.** The spike is fully self-contained — no git
-   required on the VW box.
+The developer publishes the code to GitHub first. Then, on the Vectorworks Mac:
 
-   **ZIP download (recommended for architects):** on GitHub, switch to the
-   branch, then **Code → Download ZIP**. Unzip it anywhere and `cd` into the
-   unzipped folder. Everything runs from there — `install.sh` finds its own
-   paths regardless of where you extracted it.
+1. In a web browser, open the GitHub page for the code and switch to the branch
+   you were asked to test.
+2. Click the green **Code** button → **Download ZIP**.
+3. Double-click the downloaded ZIP to unzip it, then open the Terminal app and
+   `cd` into the unzipped folder. Everything runs from there, wherever you put
+   it.
 
-   > macOS note: unzipping usually strips the executable bit, so run the helper
-   > as `bash spike/persistent_probe/install.sh` (not `./…`).
+> One macOS quirk: unzipping removes the "runnable" flag from the helper script,
+> so start it with `bash …` (as shown below) rather than double-clicking it.
 
-   **git (alternative, if git is set up):**
-   ```
-   git clone <repo-url> rt-vectorworks-mcp   # first time only
-   cd rt-vectorworks-mcp
-   git fetch origin && git checkout <branch> && git pull
-   ```
+Nothing needs installing — the checks use the Python that already comes with
+macOS, and Vectorworks provides its own scripting for the rest.
 
-   No dependencies to install for the LAB-9 spike — it is stdlib-only Python on
-   both ends, and Vectorworks supplies the `vs.*` API. (Later scaffolds add a
-   `pip install`; see their own docs.)
-3. **Run** the checks on the VW box (below).
-4. **Capture back.** Record the outcome on the Linear issue being validated
-   (the issue is the spec container — see `AGENTS.md`). Paste the terminal
-   output and note UI responsiveness. Refuting an assumption is a valid result.
+(If you happen to have git set up, you can `git clone` the repository and
+`git checkout` the branch instead — but the ZIP is the simplest path.)
 
-## What LAB-9 validates
+## The two checks
 
-Two go/no-go feasibility probes. Both prove macOS/VW 2026 assumptions that the
-Windows-only prior art cannot. The spike code lives in [`../spike/`](../spike/)
-and is **disposable** — [LAB-6] deletes it once the findings land.
+These are quick, throwaway trials to confirm two things work on macOS +
+Vectorworks 2026 before the real tool is built on top of them. Both are
+pass/fail — and a clear **"no, this doesn't work"** is a genuinely useful
+result, so don't worry if one fails. The trial code lives in
+[`../spike/`](../spike/).
 
-### Probe A — modal-dialog socket pump
+### Check A — the listener window doesn't freeze Vectorworks
 
-Proves a modal-dialog "agent session" can pump a loopback socket **without
-freezing VW's UI** and answer one read-only `vs.*` call (`vs.GetFName()`, the
-open document's filename).
+Confirms a small window can sit open inside Vectorworks, quietly wait for a
+request, and answer it (returning the open drawing's file name) **without
+locking up Vectorworks while it's open**.
 
-On the VW box:
+On the Vectorworks Mac:
 
-1. Open Vectorworks 2026 to any document (even a blank one).
-2. Load the listener: **Resource Manager** (`Cmd+R`) → **New Resource** →
-   **Script** → **Python** → paste the entire contents of
+1. Open Vectorworks 2026 with any drawing (a blank one is fine).
+2. Load the helper script: **Resource Manager** (`Cmd+R`) → **New Resource** →
+   **Script** → **Python** → paste in the entire contents of
    [`spike/vw_modal_listener.py`](../spike/vw_modal_listener.py) → **run**.
-3. A modal **"VW MCP Spike"** dialog opens and stays open, listening on
-   `127.0.0.1:9877`.
-4. **Confirm VW is not frozen**: with the dialog open, pan/zoom the document —
-   the UI should stay responsive.
-5. In a terminal on the same machine:
+3. A small **"VW MCP Spike"** window opens and stays open.
+4. **Check Vectorworks still responds**: with that window open, pan and zoom the
+   drawing — it should move normally, not freeze.
+5. In the Terminal app, run:
    ```
    python3 spike/poke.py
    ```
-6. Click **Stop** (or close the dialog) to end the session and get VW back.
+6. Click **Stop** (or close the window) when you're done — that hands
+   Vectorworks back to you.
 
-**PASS** if: the dialog opens, VW stays responsive while it is open, and
-`poke.py` prints `PASS: round trip OK. Open document filename = ...` with the
-real filename. **FAIL** (a valid result) if the UI freezes or no real value
-comes back.
+**Pass** if: the window opens, Vectorworks keeps responding while it's open, and
+the Terminal prints `PASS: round trip OK. Open document filename = ...` showing
+the real file name. **Fail** (still a useful result) if Vectorworks freezes or
+no real file name comes back.
 
-### Probe B — persistent, no-paste install
+### Check B — install it once so it survives a restart
 
-Proves a setup step can place a menu command that **survives a VW relaunch**
-and starts the session with **no per-session paste**. It uses a *stable loader*
-(the menu command holds a few lines that read-and-run the listener from disk),
-so listener logic can change without re-editing the menu command.
+Confirms the helper can be added to a Vectorworks menu **once**, so that after
+quitting and reopening Vectorworks it's still there and can be started from the
+menu — with no pasting each time. (Behind the scenes the menu item just points
+at the script file, so the script can be updated later without touching the
+menu.)
 
-On the VW box:
+On the Vectorworks Mac:
 
-1. Open Vectorworks 2026 once (so it creates its user folder).
-2. Prepare the loader:
+1. Open Vectorworks 2026 once (so it creates its settings folder).
+2. In the Terminal app, run:
    ```
-   bash spike/persistent_probe/install.sh       # defaults to VW 2026
+   bash spike/persistent_probe/install.sh
    ```
-   This bakes the absolute listener path into a loader, copies it to the
-   clipboard, and reports the macOS Plug-ins path
-   (`~/Library/Application Support/Vectorworks/2026/Plug-ins`) — confirming that
-   path is part of the probe.
-3. Create the menu command **once** (Plug-in Manager → New → Menu Command →
-   paste the loader → Save; then add it to the workspace). The script prints the
-   exact steps.
-4. **Quit and reopen Vectorworks 2026** — this is the persistence test.
-5. Click the **"VW MCP Spike"** menu command. The modal session should open with
-   no pasting. Then run `python3 spike/poke.py` to confirm the round trip
-   (same as Probe A).
+   This prepares the menu snippet, copies it to your clipboard, and confirms the
+   folder Vectorworks uses for add-ons
+   (`~/Library/Application Support/Vectorworks/2026/Plug-ins`).
+3. Add the menu command **once**: **Tools → Plug-ins → Plug-in Manager → New →
+   Menu Command**, paste the snippet (already on your clipboard), save, then add
+   it to a menu via the Workspace editor. The Terminal prints the exact clicks.
+4. **Quit Vectorworks and reopen it** — this is the real test.
+5. Click the new **"VW MCP Spike"** menu command. The listener window should open
+   with no pasting. Then run `python3 spike/poke.py` again to confirm it answers
+   (same as Check A).
 
-**PASS** if: after the relaunch the menu command is still present and starts the
-session with no paste. **FAIL** (a valid result) if it does not survive the
-relaunch, or the macOS folder path/packaging differs on VW 2026.
+**Pass** if: after reopening Vectorworks the menu command is still there and
+starts the listener with no pasting. **Fail** (still a useful result) if it's
+gone after the restart, or the add-ons folder isn't where expected on
+Vectorworks 2026.
 
-## Recording the result
+## Reporting back
 
-Post both probe outcomes as a comment on [LAB-9] (and flag them for [LAB-6]):
+Send both results to the developer (recorded on the [LAB-9] issue):
 
-- Probe A: PASS/FAIL — did the UI stay responsive? what filename came back?
-- Probe B: PASS/FAIL — did the menu command survive relaunch and run without
-  paste? what was the actual Plug-ins path?
+- **Check A:** pass/fail — did Vectorworks keep responding? what file name came
+  back?
+- **Check B:** pass/fail — was the menu command still there after a restart and
+  did it start without pasting? what was the actual add-ons folder path?
 
 [LAB-9]: https://linear.app/edmacovaz/issue/LAB-9/repeatable-vw-test-handoff-workflow
 [LAB-6]: https://linear.app/edmacovaz/issue/LAB-6/mcp-round-trip-scaffold
