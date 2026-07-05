@@ -18,8 +18,9 @@ Prior-art research this builds on: [`install-workflow.md`](install-workflow.md).
 
 - **Dev box** (this machine): authoring only. Writes code, pushes branches.
   Cannot run Vectorworks.
-- **VW box**: a macOS machine with Vectorworks 2026. Pulls the branch, runs the
-  stack over loopback, reports results.
+- **VW box**: a macOS machine with Vectorworks 2026. Downloads the branch, runs
+  the stack over loopback, reports results. **No GitHub account or git needed** —
+  a ZIP download is enough.
 
 ## The handoff loop
 
@@ -27,13 +28,25 @@ Prior-art research this builds on: [`install-workflow.md`](install-workflow.md).
    ```
    git push -u origin <branch>
    ```
-2. **Pull (VW box).** Clone once, then pull the branch:
+2. **Get the code onto the VW box.** The spike is fully self-contained — no git
+   required on the VW box.
+
+   **ZIP download (recommended for architects):** on GitHub, switch to the
+   branch, then **Code → Download ZIP**. Unzip it anywhere and `cd` into the
+   unzipped folder. Everything runs from there — `install.sh` finds its own
+   paths regardless of where you extracted it.
+
+   > macOS note: unzipping usually strips the executable bit, so run the helper
+   > as `bash spike/persistent_probe/install.sh` (not `./…`).
+
+   **git (alternative, if git is set up):**
    ```
    git clone <repo-url> rt-vectorworks-mcp   # first time only
    cd rt-vectorworks-mcp
    git fetch origin && git checkout <branch> && git pull
    ```
-   No dependencies are needed for the LAB-9 spike — it is stdlib-only Python on
+
+   No dependencies to install for the LAB-9 spike — it is stdlib-only Python on
    both ends, and Vectorworks supplies the `vs.*` API. (Later scaffolds add a
    `pip install`; see their own docs.)
 3. **Run** the checks on the VW box (below).
@@ -86,7 +99,7 @@ On the VW box:
 1. Open Vectorworks 2026 once (so it creates its user folder).
 2. Prepare the loader:
    ```
-   ./spike/persistent_probe/install.sh          # defaults to VW 2026
+   bash spike/persistent_probe/install.sh       # defaults to VW 2026
    ```
    This bakes the absolute listener path into a loader, copies it to the
    clipboard, and reports the macOS Plug-ins path
