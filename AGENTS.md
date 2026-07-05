@@ -20,16 +20,32 @@ Everything in the POC serves proving one of these end to end at small scale.
 ## Architecture (proposed)
 
 ```
-MCP client ──stdio──> Python MCP server ──[transport: decide in POC]──> Python script in Vectorworks ──> Vectorworks Python SDK/API
+MCP client ──stdio──> Python MCP server ──TCP loopback 127.0.0.1:9877──> Python script in Vectorworks ──> Vectorworks Python SDK/API
 ```
 
 - **Host:** Python MCP server, spoken to over stdio by the MCP client.
 - **Vectorworks side:** a Python script running inside Vectorworks, using the
   Vectorworks **Python SDK/API** (`vs.*`) to read/write the document.
-- **Message path:** the MCP server passes messages to the running in-VW script and gets
-  results back. The exact transport and script-loading/lifecycle model are the first
-  thing the POC pins down — start with the simplest round trip (fetch some data from a
-  live Vectorworks file) and let that drive the decision.
+- **Message path:** JSON over **TCP loopback** (`127.0.0.1:9877`) — proven end-to-end
+  on macOS/VW 2026 in [LAB-9]. The MCP server passes messages to the in-VW script and
+  gets results back. The remaining transport detail (framing + capability flags on the
+  server side, and building it on **FastMCP**) is finalised by [LAB-6]; **[decide in
+  LAB-6]** replaces this note once recorded.
+- **Lifecycle — modal, turn-taking agent session (proven in [LAB-9]).** The in-VW script
+  runs as a **modal dialog "agent session"**: it pumps the loopback socket without
+  freezing VW, but it is *turn-taking* — while the session dialog is open the **agent**
+  drives VW and manual editing is blocked; closing it hands VW back. This is the only
+  safe pure-Python lifecycle (the non-modal Python modes freeze or can't schedule).
+  Suitable for the POC's agent-driven extraction/review; **not** for live human+agent
+  co-editing — the non-modal native C++ SDK bridge (see `docs/install-workflow.md`) is
+  the future upgrade path if that's ever needed.
+- **Install / no-paste (proven in [LAB-9]).** The architect starts the session from a
+  persistent Plug-in Manager **Command** (type "Command", **not** Tool) placed in the
+  user Plug-ins folder; it survives a VW relaunch with no per-session paste. The Command
+  holds only a small **stable loader** that reads-and-runs the listener from disk.
+
+[LAB-9]: https://linear.app/edmacovaz/issue/LAB-9/repeatable-vw-test-handoff-workflow
+[LAB-6]: https://linear.app/edmacovaz/issue/LAB-6/mcp-round-trip-scaffold
 
 The sibling repos in the parent folder are prior art for this shape and worth reading:
 `../vectorworks-mcp` (Python listener over TCP) and `../vectorworks-mcp-mako` (Rust +
@@ -39,18 +55,33 @@ Unix socket).
 
 - **macOS.**
 - **Vectorworks 2026.**
+- **In-VW Python defaults to ASCII.** VW 2026's embedded Python 3.9 uses ASCII as its
+  default text encoding, so reading any file with non-ASCII content raises
+  `UnicodeDecodeError`. Always pass `encoding="utf-8"` explicitly when opening files
+  from inside Vectorworks (proven in [LAB-9]).
 
 ## Project layout
 
-**[decide in POC]** — grows as the scaffold lands (MCP server, in-VW script, skills,
-tests). Keep this section current as directories appear.
+Grows as the scaffold lands (MCP server, in-VW script, skills, tests) — keep current as
+directories appear.
+
+- `README.md` — entry point + the reusable **test-handoff workflow** (run the stack on a
+  macOS + VW 2026 machine).
+- `docs/` — `install-workflow.md` (prior-art install research), `vectorworks-glossary.md`
+  (domain terms).
+- `spike/` — **disposable** [LAB-9] feasibility probes (modal session + persistent
+  install), with their own `spike/README.md` test steps. Removed once the [LAB-6]
+  scaffold lands.
 
 ## Testing & verification
 
-**[decide in POC]** — the intended split is protocol/logic tests that run **without
-Vectorworks open** (the safety net) vs. an end-to-end path that needs a live Vectorworks
-handoff. Fill in exact commands once they exist. Do not claim end-to-end success without
-Vectorworks 2026 actually open and a round trip proven.
+The split is protocol/logic tests that run **without Vectorworks open** (the safety net)
+vs. an end-to-end path that needs a live Vectorworks handoff. The dev machine has **no
+Vectorworks**, so E2E is always a handoff: push to GitHub → download onto a macOS + VW
+2026 machine → run over loopback → record the result. That reusable workflow is
+`README.md` (proven in [LAB-9]). Exact test commands land with the [LAB-6] scaffold. Do
+not claim end-to-end success without Vectorworks 2026 actually open and a round trip
+proven.
 
 ## Working conventions
 
