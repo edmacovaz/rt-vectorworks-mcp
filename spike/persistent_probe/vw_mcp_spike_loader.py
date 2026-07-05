@@ -14,5 +14,8 @@ listener from disk — starting the modal session with no per-session paste.
 
 LISTENER_PATH = "__LISTENER_PATH__"
 
-with open(LISTENER_PATH, "r") as _f:
+# encoding="utf-8" is required: VW 2026's embedded Python defaults to ASCII, so
+# without it, reading the listener (which contains non-ASCII characters) raises
+# UnicodeDecodeError.
+with open(LISTENER_PATH, "r", encoding="utf-8") as _f:
     exec(compile(_f.read(), LISTENER_PATH, "exec"))
