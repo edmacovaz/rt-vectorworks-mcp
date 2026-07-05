@@ -153,6 +153,18 @@ class _SpikeServer:
             self._server = None
 
 
+def _set_status(dialog_id, item_id, text):
+    """Best-effort update of a dialog's static-text item (setter name varies by VW build)."""
+    for setter in ("SetControlText", "SetItemText"):
+        fn = getattr(vs, setter, None)
+        if fn is not None:
+            try:
+                fn(dialog_id, item_id, text)
+                return
+            except Exception:
+                pass
+
+
 def run():
     if vs is None:
         raise RuntimeError("This spike must run inside Vectorworks (vs module unavailable).")
@@ -193,8 +205,14 @@ def run():
             try:
                 vs.RegisterDialogForTimerEvents(dialog_id, TIMER_MS)
                 timer_registered[0] = True
-            except Exception:
-                pass
+            except Exception as exc:
+                # Without timer ticks the socket is only pumped once and pokes
+                # will hang — surface it as a NO-GO instead of failing silently.
+                _set_status(
+                    dialog_id,
+                    _STATUS_ITEM,
+                    "NO-GO: timer registration failed, socket won't pump: {}".format(exc),
+                )
             server.pump()
             return
         if item in (1, 2):  # "Stop" (OK) or Cancel — end the session

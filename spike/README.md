@@ -56,9 +56,11 @@ menu.)
    ```
    bash spike/persistent_probe/install.sh
    ```
-   This prepares the menu snippet, copies it to your clipboard, and confirms the
-   folder Vectorworks uses for add-ons
-   (`~/Library/Application Support/Vectorworks/2026/Plug-ins`).
+   This installs the listener to a stable spot, prepares the menu snippet, copies
+   it to your clipboard, and confirms the folder Vectorworks uses for add-ons
+   (`~/Library/Application Support/Vectorworks/2026/Plug-ins`). Because the
+   listener is copied out of the download, you can delete the unzipped folder
+   afterwards and the menu command still works.
 3. Add the menu command **once**: **Tools → Plug-ins → Plug-in Manager → New →
    Menu Command**, paste the snippet (already on your clipboard), save, then add
    it to a menu via the Workspace editor. The Terminal prints the exact clicks.

@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # LAB-9 Probe B — persistent, no-paste install helper (DISPOSABLE).
 #
-# Prepares the "stable loader" you paste ONCE into a Vectorworks menu command,
-# and reports whether the macOS VW 2026 user Plug-ins path exists. It does NOT
-# create the menu command for you — that is a one-time Vectorworks UI action
-# (Plug-in Manager + Workspace editor) documented in the README. The point of
-# this probe is the go/no-go: after that one-time setup, does the menu command
-# survive a relaunch and start the session with no per-session paste?
+# Installs the listener to a stable location, prepares the "stable loader" you
+# paste ONCE into a Vectorworks menu command, and reports whether the macOS VW
+# 2026 user Plug-ins path exists. It does NOT create the menu command for you —
+# that is a one-time Vectorworks UI action (Plug-in Manager + Workspace editor)
+# documented in the README. The point of this probe is the go/no-go: after that
+# one-time setup, does the menu command survive a relaunch and start the session
+# with no per-session paste?
 #
 # Usage:  ./install.sh [VW_VERSION]     (VW_VERSION defaults to 2026)
 
@@ -22,6 +23,13 @@ TEMPLATE="$SCRIPT_DIR/vw_mcp_spike_loader.py"
 GENERATED_DIR="$SCRIPT_DIR/generated"
 GENERATED="$GENERATED_DIR/vw_mcp_spike_loader.py"
 
+# The menu command must survive the download being moved or deleted, so we copy
+# the listener to a stable location OUTSIDE the unzipped folder and point the
+# menu command there. (This folder is not scanned by Vectorworks, so the copy
+# won't auto-run on launch.)
+STABLE_DIR="$HOME/Library/Application Support/vw-mcp-spike"
+STABLE_LISTENER="$STABLE_DIR/vw_modal_listener.py"
+
 PLUGINS_DIR="$HOME/Library/Application Support/Vectorworks/$VW_VERSION/Plug-ins"
 VW_USER_DIR="$HOME/Library/Application Support/Vectorworks/$VW_VERSION"
 
@@ -30,13 +38,17 @@ if [ ! -f "$LISTENER_PATH" ]; then
   exit 1
 fi
 
-# Bake the absolute listener path into the loader.
+# Copy the listener to the stable location, then bake THAT path into the loader.
+mkdir -p "$STABLE_DIR"
+cp "$LISTENER_PATH" "$STABLE_LISTENER"
 mkdir -p "$GENERATED_DIR"
-sed "s|__LISTENER_PATH__|$LISTENER_PATH|g" "$TEMPLATE" >"$GENERATED"
+sed "s|__LISTENER_PATH__|$STABLE_LISTENER|g" "$TEMPLATE" >"$GENERATED"
 
+echo "Installed listener (survives deleting the download):"
+echo "  $STABLE_LISTENER"
 echo "Generated stable loader:"
 echo "  $GENERATED"
-echo "  -> runs: $LISTENER_PATH"
+echo "  -> runs: $STABLE_LISTENER"
 echo
 
 # Feasibility signal: does the macOS VW 2026 user folder / Plug-ins path exist?
