@@ -79,8 +79,8 @@ fi
 cat <<EOF
 
 Next (one-time setup, then it persists across relaunches):
-  1. Vectorworks: Tools > Plug-ins > Plug-in Manager > New > Menu Command.
-     Name it "VW MCP Spike".
+  1. Vectorworks: Tools > Plug-ins > Plug-in Manager > New > Command
+     (the menu-command type, NOT Tool). Name it "VW MCP Spike".
   2. Edit its script and PASTE the loader (already on your clipboard). Save.
   3. Tools > Workspaces > Edit Current Workspace > Menus: drag "VW MCP Spike"
      into a menu. Save the workspace.

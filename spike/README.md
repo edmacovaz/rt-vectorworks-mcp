@@ -62,8 +62,9 @@ menu.)
    listener is copied out of the download, you can delete the unzipped folder
    afterwards and the menu command still works.
 3. Add the menu command **once**: **Tools → Plug-ins → Plug-in Manager → New →
-   Menu Command**, paste the snippet (already on your clipboard), save, then add
-   it to a menu via the Workspace editor. The Terminal prints the exact clicks.
+   Command** (the menu-command type — **not** Tool), paste the snippet (already
+   on your clipboard), save, then add it to a menu via the Workspace editor. The
+   Terminal prints the exact clicks.
 4. **Quit Vectorworks and reopen it** — this is the real test.
 5. Click the new **"VW MCP Spike"** menu command. The listener window should open
    with no pasting. Then run `python3 spike/poke.py` again to confirm it answers
