@@ -76,7 +76,17 @@ def tcp_companion(
                     )
                 lines = framer.feed(chunk)
                 if lines:
-                    return json.loads(lines[0].decode("utf-8"))
+                    try:
+                        reply = json.loads(lines[0].decode("utf-8"))
+                    except ValueError as exc:
+                        raise RuntimeError(
+                            "companion sent malformed JSON: {}".format(exc)
+                        )
+                    if not isinstance(reply, dict):
+                        raise RuntimeError(
+                            "companion sent a non-object reply: {!r}".format(reply)
+                        )
+                    return reply
 
     return send
 
@@ -95,7 +105,16 @@ def build_server(companion: Companion) -> FastMCP:
         and ``bridge_kind``. A healthy session has ``cad_api_safe=true`` and
         ``transport_only=false``; ``filename`` is null when CAD is unsafe.
         """
-        resp = companion({"action": "ping"})
+        try:
+            resp = companion({"action": "ping"})
+        except OSError as exc:
+            # No listener reachable — the common "VW closed / no session open"
+            # case. Surface it as a clear, actionable error rather than leaking a
+            # raw socket exception to the client.
+            raise RuntimeError(
+                "could not reach a VW MCP session — open one from the "
+                "VW MCP Session menu command in Vectorworks ({})".format(exc)
+            )
         if not resp.get("ok"):
             raise RuntimeError(resp.get("error", "companion ping failed"))
         return {
@@ -127,11 +146,26 @@ def build_tcp_server(
     return build_server(tcp_companion(host, port, timeout))
 
 
+def _env_number(name: str, default: "int | float", cast: Callable[[str], Any]) -> Any:
+    """Read a numeric env override, falling back to ``default`` if unset/invalid.
+
+    The launch config wires these in as strings; a blank or mistyped value must
+    not crash the server at startup with an opaque traceback.
+    """
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        return cast(raw)
+    except ValueError:
+        return default
+
+
 def _server_from_env() -> FastMCP:
     """Build the production TCP server, honouring ``VW_MCP_*`` env overrides."""
     host = os.environ.get("VW_MCP_HOST", DEFAULT_HOST)
-    port = int(os.environ.get("VW_MCP_PORT", DEFAULT_PORT))
-    timeout = float(os.environ.get("VW_MCP_TIMEOUT", DEFAULT_TIMEOUT))
+    port = _env_number("VW_MCP_PORT", DEFAULT_PORT, int)
+    timeout = _env_number("VW_MCP_TIMEOUT", DEFAULT_TIMEOUT, float)
     return build_tcp_server(host, port, timeout)
 
 

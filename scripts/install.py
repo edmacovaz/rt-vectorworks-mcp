@@ -44,24 +44,38 @@ _LOADER_TEMPLATE = """\
 # VW MCP stable loader — paste this ONCE into a Plug-in Manager Command.
 import sys
 
-STABLE_DIR = "__STABLE_DIR__"
-LISTENER_PATH = "__LISTENER_PATH__"
+STABLE_DIR = __STABLE_DIR__
+LISTENER_PATH = __LISTENER_PATH__
 
 if STABLE_DIR not in sys.path:
     sys.path.insert(0, STABLE_DIR)
 
+# Read-and-run the listener from disk in its own namespace, then start the
+# session explicitly. Importing the module has no side effects; this loader is
+# what runs it, so updating listener logic is a file swap + relaunch.
+_ns = {"__name__": "__vw_mcp_listener__", "__file__": LISTENER_PATH}
 with open(LISTENER_PATH, "r", encoding="utf-8") as _f:
-    exec(compile(_f.read(), LISTENER_PATH, "exec"))
+    exec(compile(_f.read(), LISTENER_PATH, "exec"), _ns)
+_ns["run"]()
 """
 
 
 def _copy_package(repo_root: Path, stable_dir: Path) -> Path:
-    """Copy the ``vw_mcp`` package into the stable dir; return the copy's path."""
+    """Copy the ``vw_mcp`` package into the stable dir; return the copy's path.
+
+    Copies to a temp dir and swaps it into place only after the copy fully
+    succeeds, so a mid-copy failure (disk full, interrupted run) can't destroy a
+    previously working install.
+    """
     src = repo_root / "vw_mcp"
     dst = stable_dir / "vw_mcp"
+    tmp = stable_dir / ".vw_mcp.new"
+    if tmp.exists():
+        shutil.rmtree(tmp)
+    shutil.copytree(src, tmp, ignore=shutil.ignore_patterns("__pycache__"))
     if dst.exists():
         shutil.rmtree(dst)
-    shutil.copytree(src, dst, ignore=shutil.ignore_patterns("__pycache__"))
+    tmp.rename(dst)
     return dst
 
 
@@ -101,7 +115,9 @@ def _make_venv(stable_dir: Path, host_python: str) -> Path:
     """Create an isolated venv from ``host_python`` and install fastmcp into it."""
     venv_dir = stable_dir / "venv"
     print("Creating isolated venv at {} (from {}) ...".format(venv_dir, host_python))
-    subprocess.check_call([host_python, "-m", "venv", str(venv_dir)])
+    # --clear rebuilds cleanly on an update, so a venv left pointing at a
+    # now-removed interpreter is replaced rather than reused half-broken.
+    subprocess.check_call([host_python, "-m", "venv", "--clear", str(venv_dir)])
     venv_python = venv_dir / "bin" / "python"
     print("Installing fastmcp into the venv (one-time, needs network) ...")
     subprocess.check_call(
@@ -111,8 +127,10 @@ def _make_venv(stable_dir: Path, host_python: str) -> Path:
 
 
 def _write_loader(stable_dir: Path, listener_path: Path) -> Path:
-    loader = _LOADER_TEMPLATE.replace("__STABLE_DIR__", str(stable_dir)).replace(
-        "__LISTENER_PATH__", str(listener_path)
+    # repr() bakes each path as a properly-escaped Python string literal, so a
+    # space, quote, or backslash in the path can't produce a broken loader.
+    loader = _LOADER_TEMPLATE.replace("__STABLE_DIR__", repr(str(stable_dir))).replace(
+        "__LISTENER_PATH__", repr(str(listener_path))
     )
     loader_path = stable_dir / "vw_mcp_loader.py"
     loader_path.write_text(loader, encoding="utf-8")
@@ -137,10 +155,11 @@ def main() -> int:
     )
     plugins_dir = app_support_vw / "Plug-ins"
 
-    # An existing loader means this is an update, not a fresh install — the
-    # architect must NOT paste or re-add the menu command again, so we tailor the
-    # closing guidance below.
-    updating = (stable_dir / "vw_mcp_loader.py").exists()
+    # A pre-existing venv means a prior *complete* install (not just a first run
+    # that bailed for missing Python and only wrote the loader), so this is a
+    # genuine update: the architect need not paste or re-add the menu command.
+    # We tailor the closing guidance below.
+    updating = (stable_dir / "venv").exists()
 
     stable_dir.mkdir(parents=True, exist_ok=True)
 
@@ -229,7 +248,8 @@ def main() -> int:
         print("     from the menu (it re-reads the updated tool).")
         print("  2. If the update also changed the server, restart Claude.")
     else:
-        print("Finish the setup in Vectorworks (a one-time step):")
+        print("Finish the setup in Vectorworks (a one-time step — skip any part you")
+        print("already did on an earlier run):")
         print("  1. Tools > Plug-ins > Plug-in Manager > New > Command (NOT Tool).")
         print('     Name it "VW MCP Session".')
         print(

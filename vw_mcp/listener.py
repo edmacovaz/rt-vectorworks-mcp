@@ -54,6 +54,18 @@ _SETUP_EVENT = getattr(vs, "SetupDialogC", 12255) if vs is not None else 12255
 _STATUS_ITEM = 4
 _HINT_ITEM = 5
 
+# Bound the accepted-connection table so a stalled or half-open peer (a port
+# scanner, a client killed mid-request) can't leak file descriptors over a long
+# session. Cooperating clients open, get one reply, and close, so this only ever
+# trips on misbehaving peers.
+_MAX_CONNS = 64
+
+# Reply on a briefly-blocking socket so a large payload isn't dropped by a full
+# non-blocking send buffer; the timeout bounds a pathological non-reading client.
+# (For the POC's tiny ping the buffer never fills; a full non-blocking write
+# buffer is the deeper fix once a tool returns a large reply to a slow reader.)
+_SEND_TIMEOUT_S = 5.0
+
 
 class SocketPump:
     """Non-blocking newline-JSON server for the in-VW listener.
@@ -117,6 +129,10 @@ class SocketPump:
         except (BlockingIOError, OSError):
             return
         conn.setblocking(False)
+        # Drop the oldest connection if we're at the cap (dict is insertion-
+        # ordered), so a stalled peer that never sends can't pin an FD forever.
+        if len(self._conns) >= _MAX_CONNS:
+            self._close(next(iter(self._conns)))
         self._conns[conn] = LineFramer()
 
     def _read(self, conn: socket.socket) -> None:
@@ -132,11 +148,23 @@ class SocketPump:
             return
         for line in self._conns[conn].feed(chunk):
             resp = handle_line(line, self._vs, self._dispatch_mode)
-            try:
-                conn.sendall(encode_message(resp))
-            except OSError:
-                self._close(conn)
+            if not self._send(conn, encode_message(resp)):
                 return
+
+    def _send(self, conn: socket.socket, payload: bytes) -> bool:
+        """Send one reply, tolerating a full send buffer. Returns False on close."""
+        try:
+            conn.settimeout(_SEND_TIMEOUT_S)  # block (bounded) rather than drop
+            conn.sendall(payload)
+            return True
+        except OSError:
+            self._close(conn)
+            return False
+        finally:
+            try:
+                conn.settimeout(0.0)  # restore non-blocking for select-driven reads
+            except OSError:
+                pass
 
     def _close(self, conn: socket.socket) -> None:
         self._conns.pop(conn, None)
@@ -256,7 +284,7 @@ def run() -> None:
 
 if __name__ == "__main__":
     run()
-else:
-    # VW runs a read-and-run'd script at module scope, not via __main__.
-    if vs is not None:
-        run()
+
+# Note: importing this module has NO side effects — it never auto-starts the
+# session. The installed stable loader is what runs it: it execs this file in a
+# fresh namespace and then calls ``run()`` explicitly (see scripts/install.py).

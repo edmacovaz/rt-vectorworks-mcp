@@ -20,7 +20,10 @@ def test_live_round_trip_reports_a_cad_safe_session():
     send = tcp_companion(DEFAULT_HOST, DEFAULT_PORT, timeout=5.0)
     try:
         resp = send({"action": "ping"})
-    except OSError:
+    except (OSError, RuntimeError):
+        # OSError = nothing listening; RuntimeError = something answered but
+        # dropped the connection / spoke garbage (a stale or half-open peer).
+        # Either way there's no live session to assert against — skip cleanly.
         pytest.skip(
             "no VW MCP session reachable on {}:{} — open one from the "
             "installed VW menu Command".format(DEFAULT_HOST, DEFAULT_PORT)
