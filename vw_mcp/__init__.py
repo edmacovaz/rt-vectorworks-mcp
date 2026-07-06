@@ -6,9 +6,11 @@ Package layout mirrors the `vs` seam that makes off-Vectorworks testing possible
   else depends on the `VsPort` seam, so it runs and is tested off-VW.
 - `dispatch` — pure request→response logic, typed against `VsPort`.
 - `framing` — the newline-delimited-JSON wire format (line boundaries + encoding).
-- `server` — the FastMCP server exposing the read-only tool(s).
+- `listener` — the in-VW runtime: a modal agent-session dialog + non-blocking
+  socket pump, built on the tested core above.
+- `server` — the FastMCP server exposing the read-only `vw_ping` tool.
 
-The companion modules (`vs_adapter`, `dispatch`, `framing`) run inside
+The companion modules (`vs_adapter`, `dispatch`, `framing`, `listener`) run inside
 Vectorworks 2026's embedded Python 3.9, so they must stay 3.9-compatible even
 though the host env is newer. `server` runs only on the host (FastMCP) side.
 """

@@ -20,6 +20,44 @@ def test_unknown_action_is_a_structured_error():
     assert "nope" in resp["error"]
 
 
+def test_ping_proves_cad_safety_by_doing_the_real_read():
+    resp = handle_request(
+        {"action": "ping"}, StubVsAdapter("Dock.vwx"), dispatch_mode="dialog"
+    )
+    assert resp["ok"] is True
+    assert resp["cad_api_safe"] is True
+    assert resp["transport_only"] is False
+    assert resp["dispatch_mode"] == "dialog"
+    assert resp["bridge_kind"] == "python_dialog_agent_session"
+    assert resp["filename"] == "Dock.vwx"
+
+
+def test_ping_reports_transport_only_when_the_read_raises():
+    # A reachable listener whose CAD call fails is transport-only, not an error:
+    # the ping still succeeds (ok=True) but the flags refuse to claim CAD-safety.
+    class RaisingVsAdapter:
+        def get_open_filename(self):
+            raise RuntimeError("vs boom")
+
+    resp = handle_request(
+        {"action": "ping"}, RaisingVsAdapter(), dispatch_mode="dialog"
+    )
+    assert resp["ok"] is True
+    assert resp["cad_api_safe"] is False
+    assert resp["transport_only"] is True
+    assert resp["bridge_kind"] == "python_transport_only"
+    assert "filename" not in resp
+    assert "vs boom" in resp["error"]
+
+
+def test_ping_dispatch_mode_defaults_to_unknown_off_vw():
+    resp = handle_request({"action": "ping"}, StubVsAdapter())
+    assert resp["dispatch_mode"] == "unknown"
+    # Off-VW the read still works against the stub, so CAD is nominally safe, but
+    # bridge_kind is not the dialog session — it is a generic CAD-safe bridge.
+    assert resp["bridge_kind"] == "python_cad_safe"
+
+
 def test_handle_line_parses_and_dispatches_json():
     resp = handle_line(b'{"action": "filename"}', StubVsAdapter("Untitled"))
     assert resp == {"ok": True, "action": "filename", "filename": "Untitled"}

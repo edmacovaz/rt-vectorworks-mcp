@@ -1,23 +1,35 @@
-"""Example live-Vectorworks check — the opt-in `e2e` marker convention.
+"""Live-Vectorworks end-to-end check — the opt-in `e2e` marker.
 
 Excluded from the default `uv run pytest`; opt in with `uv run pytest -m e2e` on
-a Mac with VW 2026 open. Real e2e tests (LAB-6) will drive the full MCP server →
-loopback → live-VW round trip. Until that transport lands, this pins down the
-gate: an e2e test only means anything inside Vectorworks' Python, so it skips
-cleanly elsewhere rather than failing.
+a Mac with VW 2026 open **and a VW MCP session running** (the modal listener,
+started from the installed Plug-in Manager Command). It drives the real host
+transport → loopback → live listener round trip and asserts the capability flags
+of a healthy CAD session. It skips cleanly when no session is reachable, so it
+never fails off-Vectorworks — a real round trip is the only thing that makes it
+pass (see AGENTS.md: E2E is never claimed without one).
 """
 
 import pytest
 
-from vw_mcp.vs_adapter import VectorworksAdapter
+from vw_mcp.server import DEFAULT_HOST, DEFAULT_PORT, tcp_companion
 
 pytestmark = pytest.mark.e2e
 
 
-def test_live_open_document_filename():
+def test_live_round_trip_reports_a_cad_safe_session():
+    send = tcp_companion(DEFAULT_HOST, DEFAULT_PORT, timeout=5.0)
     try:
-        adapter = VectorworksAdapter()
-    except RuntimeError:
-        pytest.skip("not running inside Vectorworks (vs module unavailable)")
-    filename = adapter.get_open_filename()
-    assert isinstance(filename, str) and filename
+        resp = send({"action": "ping"})
+    except (OSError, RuntimeError):
+        # OSError = nothing listening; RuntimeError = something answered but
+        # dropped the connection / spoke garbage (a stale or half-open peer).
+        # Either way there's no live session to assert against — skip cleanly.
+        pytest.skip(
+            "no VW MCP session reachable on {}:{} — open one from the "
+            "installed VW menu Command".format(DEFAULT_HOST, DEFAULT_PORT)
+        )
+    assert resp["ok"] is True
+    assert resp["cad_api_safe"] is True
+    assert resp["transport_only"] is False
+    assert resp["dispatch_mode"] == "dialog"
+    assert isinstance(resp["filename"], str) and resp["filename"]
