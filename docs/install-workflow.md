@@ -76,10 +76,17 @@ upgrade path, not part of the base install.)
   is on PATH; the reliable fallback is editing `~/.claude.json` / project
   `.mcp.json` directly.
 
-## Recommended defaults for the POC's open decisions
+## Decisions (settled in LAB-6)
 
-- **Transport:** TCP loopback — simplest Python option, platform-neutral.
-- **Lifecycle:** copy the generated-launcher + stable-loader + modal-dialog-session
-  pattern; it's battle-tested.
-- **First round trip to prove:** `vw_ping` returning real capability flags from a
-  live VW 2026 document.
+These were the POC's open decisions; LAB-6 settled and shipped them:
+
+- **Transport: DECIDED — TCP loopback** `127.0.0.1:9877`, newline-delimited JSON,
+  host server on **FastMCP** (`vw_mcp/server.py`, `tcp_companion`).
+- **Lifecycle: DECIDED — modal-dialog agent session** with a stable-loader
+  indirection (`vw_mcp/listener.py`; installed by `scripts/install.py`).
+- **First round trip: DONE — `vw_ping`** returns the open document's filename plus
+  *proven* capability flags (`cad_api_safe` / `transport_only` / `dispatch_mode` /
+  `bridge_kind`) from a live VW 2026 document.
+
+Still open (deliberately deferred): **no-paste auto-registration** of the menu
+Command (the loader is still pasted once) — tracked in **LAB-11**.

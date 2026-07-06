@@ -8,68 +8,86 @@ Vectorworks automation product.
 > **Status: proof of concept.** See [`AGENTS.md`](AGENTS.md) for the
 > architecture, principles, and scope.
 
-## Prerequisites
+## Installing the plugin and MCP
 
-- **A Mac with Vectorworks 2026.** This is the only place anything can be run
-  end to end — the tool works entirely on that one machine.
-- The development machine that authors the code has **no Vectorworks** on it, so
-  every end-to-end check is handed off to a Vectorworks Mac (below).
+The whole tool runs on a single Mac with **Vectorworks 2026**, talking only to
+itself over a local connection — nothing is sent over the internet or to another
+machine. You need:
 
-## Running it on a Vectorworks Mac
+- **Vectorworks 2026.**
+- **Python 3.10+** for the MCP server. macOS's built-in Python is often older; the
+  installer checks and tells you how to get a newer one (e.g.
+  `brew install python@3.12`) if you need it. The Vectorworks side uses
+  Vectorworks' own Python, so nothing extra is needed there.
 
-Because the development machine can't run Vectorworks, the code is handed off to
-a Mac that has it. This is the durable, repeatable process every check reuses:
+### 1. Get the code onto the Mac
 
-1. **The developer publishes the code** to GitHub.
-2. **Get the code onto the Vectorworks Mac.** You don't need a GitHub account or
-   git — a ZIP is enough:
-   - In a browser, open the GitHub page for the code, switch to the branch you
-     were asked to test, then click the green **Code → Download ZIP**.
-   - Double-click the ZIP to unzip it, open the **Terminal** app, and `cd` into
-     the unzipped folder. Everything runs from there, wherever you put it.
-   - Nothing needs installing — the checks use the Python that already comes with
-     macOS, and Vectorworks provides its own scripting for the rest.
+You don't need a GitHub account or git — a ZIP is enough:
 
-   > macOS quirk: unzipping removes the "runnable" flag from scripts, so start
-   > them with `bash …` / `python3 …` (as the instructions show) rather than
-   > double-clicking.
+- On the code's GitHub page, switch to the branch you want and click
+  **Code → Download ZIP**.
+- Double-click to unzip, open the **Terminal** app, and `cd` into the unzipped
+  folder. Everything runs from there.
 
-   *(If you happen to have git set up, you can `git clone` the repo and
-   `git checkout` the branch instead — but the ZIP is the simplest path.)*
-3. **Run the checks** for the current implementation — see
-   **[Testing this implementation](#testing-this-implementation)** below.
-4. **Report the results** back to the developer (recorded on the matching Linear
-   issue).
+> macOS quirk: unzipping clears the "runnable" flag on scripts, so start them
+> with `python3 …` (as shown below) rather than double-clicking.
 
-Everything runs on that one Mac and only talks to itself — nothing is sent over
-the internet or to another computer. This is also how each architect will
-eventually run the tool, on their own machine.
+*(If you already use git, `git clone` then `git checkout <branch>` works too.)*
 
-## Testing this implementation
+### 2. Install it
 
-This POC's first implementation is a small, throwaway trial that confirms two
-things work on macOS + Vectorworks 2026 before the real tool is built on them.
+From the unzipped folder, run:
 
-➡️ **Step-by-step test instructions: [`spike/README.md`](spike/README.md).**
+```sh
+python3 scripts/install.py
+```
 
-(That trial code lives in [`spike/`](spike/) and is disposable — it will be
-removed once the real scaffold lands. The handoff process above is the durable
-part.)
+This copies the tool to a permanent location (so you can delete the download
+afterwards), sets up an isolated Python environment for the MCP server, and copies
+a short **loader** snippet to your clipboard. It then prints the remaining steps:
 
-## Developing: the no-Vectorworks safety net
+1. In Vectorworks: **Tools → Plug-ins → Plug-in Manager → New → Command** (the
+   menu-command type, **not** Tool). Name it **VW MCP Session**.
+2. Edit its script, **paste** the loader (already on your clipboard) and save,
+   then add it to a menu via **Tools → Workspaces → Edit Current Workspace →
+   Menus**. This is a one-time setup; the command then stays in your menu across
+   restarts.
+3. Connect Claude to the MCP server. The installer prints a ready-made command
+   for this — run it in the Terminal, or pass it to your developer to set up. It's
+   a one-time step and doesn't change anything in Vectorworks.
 
-Everything above is for the **architect** running the tool on a Vectorworks Mac.
-This section is for a **contributor** changing the code — a separate audience with
-a separate toolchain that an architect never touches.
+### 3. Use it
 
-The point of this net is fast, trustworthy feedback **with Vectorworks not
-running**: the MCP tool behaviour, the server ↔ in-VW message path, and the
-companion logic (exercised against a stubbed `vs`) all run on the dev machine.
-Live-VW end-to-end checks stay opt-in (see the handoff above) and are excluded
-from this run.
+1. Open a drawing and click the **VW MCP Session** menu command. A small window
+   opens and the session starts; Vectorworks stays responsive while it's open, and
+   closing the window hands control back to you.
+2. In Claude, ask it to check its connection to Vectorworks. A healthy session
+   reports the open drawing's file name back and confirms it can read the live
+   document.
 
-One-time setup — [`uv`](https://docs.astral.sh/uv/) manages the environment,
-dependencies, and Python for you:
+To check the connection without Claude, run `python3 scripts/vw_ping.py` in the
+Terminal while a session is open — it prints whether it reached a healthy session.
+
+### Updating to a new version
+
+Get the new code onto the Mac as in step 1, then run `python3 scripts/install.py`
+from the new folder. It refreshes everything in place and recognises that it's an
+update: the menu command and the Claude connection stay as they are, so there's
+nothing to paste or set up again. To load the new version, close the **VW MCP
+Session** window if it's open and start it again from the menu; if the update also
+changed the server, restart Claude.
+
+## Working on the code
+
+The code can be changed and checked **without Vectorworks** — the fast feedback
+loop for anyone editing it. It covers the MCP tool behaviour, the server ↔
+Vectorworks message path, a real local-connection round trip (host client ↔ the
+listener's socket server), and the logic behind them, all against a stubbed `vs`.
+Live-Vectorworks checks stay opt-in (they use the handoff in step 1) and are
+excluded from this run.
+
+[`uv`](https://docs.astral.sh/uv/) manages the environment, dependencies, and
+Python:
 
 ```sh
 brew install uv       # one-time; the only thing you install by hand
@@ -79,13 +97,13 @@ uv sync               # creates the venv and installs deps (incl. dev tools)
 Then, from the repo root:
 
 ```sh
-uv run pytest         # the no-Vectorworks safety net — needs no VW
+uv run pytest         # the checks — no Vectorworks needed
 uv run ruff check     # lint
 uv run ruff format    # format
 ```
 
-`uv run pytest` excludes the live-VW checks by default. To run those (only on a
-Mac with VW 2026 open), use `uv run pytest -m e2e`.
+`uv run pytest` excludes the live-Vectorworks checks by default. To run those
+(only on a Mac with VW 2026 open and a session running), use `uv run pytest -m e2e`.
 
 ## Key docs
 
