@@ -56,6 +56,37 @@ things work on macOS + Vectorworks 2026 before the real tool is built on them.
 removed once the real scaffold lands. The handoff process above is the durable
 part.)
 
+## Developing: the no-Vectorworks safety net
+
+Everything above is for the **architect** running the tool on a Vectorworks Mac.
+This section is for a **contributor** changing the code — a separate audience with
+a separate toolchain that an architect never touches.
+
+The point of this net is fast, trustworthy feedback **with Vectorworks not
+running**: the MCP tool behaviour, the server ↔ in-VW message path, and the
+companion logic (exercised against a stubbed `vs`) all run on the dev machine.
+Live-VW end-to-end checks stay opt-in (see the handoff above) and are excluded
+from this run.
+
+One-time setup — [`uv`](https://docs.astral.sh/uv/) manages the environment,
+dependencies, and Python for you:
+
+```sh
+brew install uv       # one-time; the only thing you install by hand
+uv sync               # creates the venv and installs deps (incl. dev tools)
+```
+
+Then, from the repo root:
+
+```sh
+uv run pytest         # the no-Vectorworks safety net — needs no VW
+uv run ruff check     # lint
+uv run ruff format    # format
+```
+
+`uv run pytest` excludes the live-VW checks by default. To run those (only on a
+Mac with VW 2026 open), use `uv run pytest -m e2e`.
+
 ## Key docs
 
 - [`AGENTS.md`](AGENTS.md) — what this is, architecture, principles, scope.

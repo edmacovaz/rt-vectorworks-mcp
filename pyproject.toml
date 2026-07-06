@@ -1,0 +1,42 @@
+[project]
+name = "vw-mcp"
+version = "0.0.0"
+description = "MCP server + in-Vectorworks companion for driving VW 2026 from an LLM (RT internal, POC)."
+requires-python = ">=3.10"
+dependencies = [
+    "fastmcp>=3",
+]
+
+[dependency-groups]
+# Contributor-only tooling. Installed by `uv sync`; never shipped to an architect.
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# The package is imported straight from the source tree (no build/install step
+# in the POC), so put the repo root on sys.path for the test run.
+pythonpath = ["."]
+# The default run is the no-Vectorworks safety net: exclude the opt-in live-VW
+# checks so `uv run pytest` never needs Vectorworks. Run them explicitly with
+# `uv run pytest -m e2e` on a machine with VW 2026 open (see README).
+addopts = "-m 'not e2e'"
+markers = [
+    "e2e: live-Vectorworks end-to-end check; needs VW 2026 open. Excluded from the default run.",
+]
+
+[tool.ruff]
+# The companion package runs inside Vectorworks 2026's embedded Python 3.9, so
+# its modules must stay 3.9-compatible even though the host env is >=3.10.
+target-version = "py39"
+# `spike/` is disposable LAB-9 probe code that must stay self-contained (it runs
+# from a downloaded ZIP with no tooling installed), so keep ruff off it.
+extend-exclude = ["spike"]
+
+[tool.ruff.lint]
+extend-select = ["I"]  # import sorting
+
+# The package is pure-Python and imported directly from the source tree in the
+# POC (no build/install step), so no [build-system] table is needed yet.
