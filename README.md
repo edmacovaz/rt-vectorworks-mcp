@@ -20,6 +20,17 @@ machine. You need:
   `brew install python@3.12`) if you need it. The Vectorworks side uses
   Vectorworks' own Python, so nothing extra is needed there.
 
+> **Coming from the LAB-9 spike?** If you previously installed the throwaway
+> spike on this Mac, remove it first so it can't clash with the new session (both
+> use the same local port `127.0.0.1:9877`):
+> - In Vectorworks: **Tools → Plug-ins → Plug-in Manager**, select the old **VW
+>   MCP Spike** command, and delete it (also remove it from the menu via the
+>   Workspace editor if you added it there).
+> - Optionally delete the spike's leftover folder:
+>   `~/Library/Application Support/vw-mcp-spike`.
+>
+> A machine that never had the spike can skip this.
+
 ### 1. Get the code onto the Mac
 
 You don't need a GitHub account or git — a ZIP is enough:
