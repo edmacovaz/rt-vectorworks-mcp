@@ -4,6 +4,15 @@
 > first implementation. The code here is disposable — it will be removed once
 > the real scaffold lands ([LAB-6]). The durable part is the handoff process in
 > the [top-level README](../README.md).
+>
+> **Superseded logic ([LAB-7]).** The listener's request-handling and
+> newline-JSON framing now have a real, tested home in `vw_mcp/` (checkable
+> without Vectorworks via `uv run pytest`). This spike is intentionally left
+> self-contained — it runs from a downloaded ZIP with nothing installed — so it
+> keeps its own copy and stays the interim live-VW proof until LAB-6's real
+> listener replaces it.
+
+[LAB-7]: https://linear.app/edmacovaz/issue/LAB-7/verify-mcp-server-and-companion-logic-changes-without-opening
 
 First get the code onto a Mac with **Vectorworks 2026** and open a Terminal in
 the unzipped folder — see [**Running it on a Vectorworks
