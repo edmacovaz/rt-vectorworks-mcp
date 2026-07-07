@@ -8,7 +8,8 @@ Package layout mirrors the `vs` seam that makes off-Vectorworks testing possible
 - `framing` — the newline-delimited-JSON wire format (line boundaries + encoding).
 - `listener` — the in-VW runtime: a modal agent-session dialog + non-blocking
   socket pump, built on the tested core above.
-- `server` — the FastMCP server exposing the read-only `vw_ping` tool.
+- `server` — the FastMCP server exposing the read-only `ping` and `read_classes`
+  tools.
 
 The companion modules (`vs_adapter`, `dispatch`, `framing`, `listener`) run inside
 Vectorworks 2026's embedded Python 3.9, so they must stay 3.9-compatible even

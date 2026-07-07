@@ -48,7 +48,7 @@ SDK needed.
    Script → Python → paste **only the loader** → run. A modal "VW MCP Listener"
    dialog stays open for the session. (Optionally a persistent menu command via
    Plug-in Manager.)
-6. **Verify end-to-end** — call `vw_ping`; healthy = `dispatch_mode=dialog`,
+6. **Verify end-to-end** — call `ping`; healthy = `dispatch_mode=dialog`,
    `cad_api_safe=true`, `transport_only=false`. Raw socket reachability alone is
    **not** sufficient.
 
@@ -84,7 +84,7 @@ These were the POC's open decisions; LAB-6 settled and shipped them:
   host server on **FastMCP** (`vw_mcp/server.py`, `tcp_companion`).
 - **Lifecycle: DECIDED — modal-dialog agent session** with a stable-loader
   indirection (`vw_mcp/listener.py`; installed by `scripts/install.py`).
-- **First round trip: DONE — `vw_ping`** returns the open document's filename plus
+- **First round trip: DONE — `ping`** returns the open document's filename plus
   *proven* capability flags (`cad_api_safe` / `transport_only` / `dispatch_mode` /
   `bridge_kind`) from a live VW 2026 document.
 

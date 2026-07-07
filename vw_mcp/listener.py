@@ -40,7 +40,7 @@ HOST = "127.0.0.1"
 PORT = 9877
 
 # The lifecycle mode this listener runs in: a modal, turn-taking agent session.
-# Reported in ``vw_ping``'s capability flags (see vw_mcp.dispatch).
+# Reported in the ``ping`` tool's capability flags (see vw_mcp.dispatch).
 DISPATCH_MODE = "dialog"
 
 # Milliseconds between dialog timer ticks; each tick pumps the socket. Small

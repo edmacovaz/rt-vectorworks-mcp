@@ -1,7 +1,7 @@
 """Companion dispatch logic, exercised against a stubbed `vs` (no Vectorworks)."""
 
-from vw_mcp.dispatch import handle_line, handle_request
-from vw_mcp.vs_adapter import StubVsAdapter
+from vw_mcp.dispatch import CLASSES_SCHEMA_VERSION, handle_line, handle_request
+from vw_mcp.vs_adapter import StubVsAdapter, _StubClass
 
 
 def test_filename_action_returns_open_document_name():
@@ -56,6 +56,27 @@ def test_ping_dispatch_mode_defaults_to_unknown_off_vw():
     # Off-VW the read still works against the stub, so CAD is nominally safe, but
     # bridge_kind is not the dialog session — it is a generic CAD-safe bridge.
     assert resp["bridge_kind"] == "python_cad_safe"
+
+
+def test_read_classes_assembles_the_versioned_shape():
+    vs = StubVsAdapter(
+        classes=[
+            _StubClass("None", in_use=True),
+            _StubClass("A-WALL", in_use=True, line_weight=25),
+            _StubClass("Z-UNUSED", in_use=False),
+        ]
+    )
+    resp = handle_request({"action": "read_classes"}, vs)
+    assert resp["ok"] is True
+    assert resp["action"] == "read_classes"
+    assert resp["schema_version"] == CLASSES_SCHEMA_VERSION
+    by_name = {c["name"]: c for c in resp["classes"]}
+    # None is a flagged built-in and in use; Z-UNUSED is a vestigial practice class.
+    assert by_name["None"]["always_present"] is True
+    assert by_name["A-WALL"]["always_present"] is False
+    assert by_name["A-WALL"]["in_use"] is True
+    assert by_name["Z-UNUSED"]["in_use"] is False
+    assert by_name["A-WALL"]["attributes"]["line_weight"] == 25
 
 
 def test_handle_line_parses_and_dispatches_json():

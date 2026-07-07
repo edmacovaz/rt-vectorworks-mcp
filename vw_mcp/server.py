@@ -1,17 +1,21 @@
-"""The host-side MCP server (FastMCP), exposing a read-only Vectorworks tool.
+"""The host-side MCP server (FastMCP), exposing read-only Vectorworks tools.
 
-This runs on the host, not inside Vectorworks: the tool forwards a request to
+This runs on the host, not inside Vectorworks: each tool forwards a request to
 the in-VW companion over a *companion transport* and shapes the reply. That
 transport is a seam — in production it is a TCP client to the loopback listener
 (:func:`tcp_companion`), but the server only depends on its shape, so it can be
 driven with Vectorworks closed by an in-process stub (:func:`in_process_companion`).
 
-The one tool is ``vw_ping``: it returns a real ``vs.*`` value (the open document's
-filename) **plus** capability flags (``cad_api_safe`` / ``transport_only`` /
-``dispatch_mode`` / ``bridge_kind``). The flags are earned, not declared — the
-in-VW listener only reports ``cad_api_safe=true`` when the real read just
-succeeded — so a healthy CAD-safe session is distinguishable from a merely
-socket-reachable ``transport_only`` one (see :mod:`vw_mcp.dispatch`).
+Tools (the server namespaces them, so no ``vw_`` prefix is needed):
+
+- ``ping`` returns a real ``vs.*`` value (the open document's filename) **plus**
+  capability flags (``cad_api_safe`` / ``transport_only`` / ``dispatch_mode`` /
+  ``bridge_kind``). The flags are earned, not declared — the in-VW listener only
+  reports ``cad_api_safe=true`` when the real read just succeeded — so a healthy
+  CAD-safe session is distinguishable from a merely socket-reachable
+  ``transport_only`` one (see :mod:`vw_mcp.dispatch`).
+- ``read_classes`` returns the open document's class list in a stable, versioned
+  shape (see :func:`vw_mcp.dispatch._read_classes`).
 """
 
 from __future__ import annotations
@@ -93,10 +97,29 @@ def tcp_companion(
 
 def build_server(companion: Companion) -> FastMCP:
     """Build the MCP server. ``companion`` is the seam to the in-VW listener."""
-    mcp: FastMCP = FastMCP("vw-mcp-poc")
+    mcp: FastMCP = FastMCP("vw-mcp")
+
+    def _reach(request: dict[str, Any]) -> dict[str, Any]:
+        """Forward one request to the companion, normalising the failure modes.
+
+        Every transport failure — an unreachable listener (``OSError``) or a
+        session that answers then drops/garbles the reply (``tcp_companion``
+        raises ``RuntimeError``) — and a companion-level ``ok=false`` become the
+        same actionable error, so no tool leaks a raw exception to the agent.
+        """
+        try:
+            resp = companion(request)
+        except (OSError, RuntimeError) as exc:
+            raise RuntimeError(
+                "could not reach a VW MCP session — open one from the "
+                "VW MCP Session menu command in Vectorworks ({})".format(exc)
+            )
+        if not resp.get("ok"):
+            raise RuntimeError(resp.get("error", "companion request failed"))
+        return resp
 
     @mcp.tool
-    def vw_ping() -> dict[str, Any]:
+    def ping() -> dict[str, Any]:
         """Reach the live Vectorworks document and report health.
 
         Returns the open document's ``filename`` (a real ``vs.*`` read) together
@@ -105,24 +128,31 @@ def build_server(companion: Companion) -> FastMCP:
         and ``bridge_kind``. A healthy session has ``cad_api_safe=true`` and
         ``transport_only=false``; ``filename`` is null when CAD is unsafe.
         """
-        try:
-            resp = companion({"action": "ping"})
-        except OSError as exc:
-            # No listener reachable — the common "VW closed / no session open"
-            # case. Surface it as a clear, actionable error rather than leaking a
-            # raw socket exception to the client.
-            raise RuntimeError(
-                "could not reach a VW MCP session — open one from the "
-                "VW MCP Session menu command in Vectorworks ({})".format(exc)
-            )
-        if not resp.get("ok"):
-            raise RuntimeError(resp.get("error", "companion ping failed"))
+        resp = _reach({"action": "ping"})
         return {
             "filename": resp.get("filename"),
             "cad_api_safe": bool(resp.get("cad_api_safe", False)),
             "transport_only": bool(resp.get("transport_only", True)),
             "dispatch_mode": resp.get("dispatch_mode", "unknown"),
             "bridge_kind": resp.get("bridge_kind", "unknown"),
+        }
+
+    @mcp.tool
+    def read_classes() -> dict[str, Any]:
+        """Read the open Vectorworks document's class list.
+
+        Returns a stable, versioned shape: ``schema_version`` plus a ``classes``
+        list where each entry carries its ``name``, an ``always_present`` flag
+        (``None`` / ``Dimension`` built-ins), an ``in_use`` flag (any object
+        assigned), and its graphic ``attributes`` (pen, fill, line, opacity,
+        visibility; resource-backed fills by reference). A class whose attributes
+        can't be read comes back with ``attributes: null`` rather than being
+        dropped. Read-only.
+        """
+        resp = _reach({"action": "read_classes"})
+        return {
+            "schema_version": resp.get("schema_version"),
+            "classes": resp.get("classes", []),
         }
 
     return mcp
