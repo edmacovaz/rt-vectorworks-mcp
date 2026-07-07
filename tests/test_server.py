@@ -93,6 +93,10 @@ def _read_classes(server):
     return _call(server, "read_classes").data
 
 
+def _by_name(classes):
+    return {c["name"]: c for c in classes}
+
+
 def test_read_classes_returns_the_versioned_shape():
     server = build_server(in_process_companion(StubVsAdapter(classes=CONTRACT_CLASSES)))
     data = _read_classes(server)
@@ -101,7 +105,7 @@ def test_read_classes_returns_the_versioned_shape():
     names = [c["name"] for c in data["classes"]]
     assert names == ["None", "Dimension", "A-WALL", "Z-UNUSED"]
 
-    by_name = {c["name"]: c for c in data["classes"]}
+    by_name = _by_name(data["classes"])
     wall = by_name["A-WALL"]
     # Every per-class key the contract promises is present and typed.
     assert wall["always_present"] is False
@@ -121,7 +125,7 @@ def test_read_classes_returns_the_versioned_shape():
 
 def test_read_classes_flags_always_present_builtins():
     server = build_server(in_process_companion(StubVsAdapter(classes=CONTRACT_CLASSES)))
-    by_name = {c["name"]: c for c in _read_classes(server)["classes"]}
+    by_name = _by_name(_read_classes(server)["classes"])
     # None and Dimension are flagged, not silently listed; a practice class is not.
     assert by_name["None"]["always_present"] is True
     assert by_name["Dimension"]["always_present"] is True
@@ -130,7 +134,7 @@ def test_read_classes_flags_always_present_builtins():
 
 def test_read_classes_reports_in_use_per_class():
     server = build_server(in_process_companion(StubVsAdapter(classes=CONTRACT_CLASSES)))
-    by_name = {c["name"]: c for c in _read_classes(server)["classes"]}
+    by_name = _by_name(_read_classes(server)["classes"])
     # The used/vestigial signal: A-WALL has objects, Z-UNUSED is empty cruft.
     assert by_name["A-WALL"]["in_use"] is True
     assert by_name["Z-UNUSED"]["in_use"] is False
@@ -146,7 +150,7 @@ def test_read_classes_degrades_one_unreadable_class_without_dropping_it():
             return super().class_pen_fore(name)
 
     server = build_server(in_process_companion(OneBadClass(classes=CONTRACT_CLASSES)))
-    by_name = {c["name"]: c for c in _read_classes(server)["classes"]}
+    by_name = _by_name(_read_classes(server)["classes"])
     assert by_name["A-WALL"]["attributes"] is None
     assert "vs attr boom" in by_name["A-WALL"]["attributes_error"]
     # A sibling class is untouched.

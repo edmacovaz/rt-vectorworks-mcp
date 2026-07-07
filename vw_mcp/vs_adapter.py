@@ -16,6 +16,7 @@ Runs inside VW 2026's embedded Python 3.9, so keep it 3.9-compatible.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import List, Optional, Protocol, Set, Tuple
 
 # An RGB colour as three 0–255 channels (Vectorworks returns longints per channel).
@@ -184,38 +185,27 @@ class VectorworksAdapter:
         return used
 
 
+@dataclass
 class _StubClass:
-    """One class in :class:`StubVsAdapter`'s in-memory document model."""
+    """One class in :class:`StubVsAdapter`'s in-memory document model.
 
-    def __init__(
-        self,
-        name: str,
-        in_use: bool = False,
-        pen_fore: Rgb = (0, 0, 0),
-        pen_back: Rgb = (255, 255, 255),
-        line_weight: int = 10,
-        line_style: int = 0,
-        fill_fore: Rgb = (255, 255, 255),
-        fill_back: Rgb = (255, 255, 255),
-        fill_pattern: int = 1,
-        fill_resource: Optional[FillResource] = None,
-        opacity: int = 100,
-        visible: bool = True,
-        uses_graphics: bool = True,
-    ) -> None:
-        self.name = name
-        self.in_use = in_use
-        self.pen_fore = pen_fore
-        self.pen_back = pen_back
-        self.line_weight = line_weight
-        self.line_style = line_style
-        self.fill_fore = fill_fore
-        self.fill_back = fill_back
-        self.fill_pattern = fill_pattern
-        self.fill_resource = fill_resource
-        self.opacity = opacity
-        self.visible = visible
-        self.uses_graphics = uses_graphics
+    A plain record; every default is immutable (tuples/scalars/None), so no
+    ``field(default_factory=...)`` is needed.
+    """
+
+    name: str
+    in_use: bool = False
+    pen_fore: Rgb = (0, 0, 0)
+    pen_back: Rgb = (255, 255, 255)
+    line_weight: int = 10
+    line_style: int = 0
+    fill_fore: Rgb = (255, 255, 255)
+    fill_back: Rgb = (255, 255, 255)
+    fill_pattern: int = 1
+    fill_resource: Optional[FillResource] = None
+    opacity: int = 100
+    visible: bool = True
+    uses_graphics: bool = True
 
 
 class StubVsAdapter:
