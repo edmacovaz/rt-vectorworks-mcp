@@ -28,13 +28,14 @@ MCP client ──stdio──> Python MCP server ──TCP loopback 127.0.0.1:987
   Vectorworks **Python SDK/API** (`vs.*`) to read/write the document.
 - **Message path (decided in [LAB-6]).** JSON over **TCP loopback** (`127.0.0.1:9877`),
   **newline-delimited** — one JSON object per line — with the host server built on
-  **FastMCP**. The host exposes one read-only tool, `vw_ping`: it forwards a request to
-  the in-VW listener and shapes the reply, which carries a real `vs.*` value (the open
-  document's filename) **plus capability flags** (`cad_api_safe` / `transport_only` /
-  `dispatch_mode` / `bridge_kind`). The flags are *proven*, not declared — the listener
-  only reports `cad_api_safe=true` when the real read just succeeded — so a healthy CAD
-  session is distinguishable from a socket-reachable but CAD-unsafe (`transport_only`)
-  one.
+  **FastMCP**. The host exposes read-only tools (the server namespaces them, so no
+  `vw_` prefix): `ping` forwards a request to the in-VW listener and shapes the reply,
+  which carries a real `vs.*` value (the open document's filename) **plus capability
+  flags** (`cad_api_safe` / `transport_only` / `dispatch_mode` / `bridge_kind`). The
+  flags are *proven*, not declared — the listener only reports `cad_api_safe=true` when
+  the real read just succeeded — so a healthy CAD session is distinguishable from a
+  socket-reachable but CAD-unsafe (`transport_only`) one. `read_classes` (added in
+  [LAB-8]) returns the open document's class list in a stable, versioned shape.
 - **Lifecycle — modal, turn-taking agent session (proven in [LAB-9]).** The in-VW script
   runs as a **modal dialog "agent session"**: it pumps the loopback socket without
   freezing VW, but it is *turn-taking* — while the session dialog is open the **agent**
@@ -56,6 +57,7 @@ MCP client ──stdio──> Python MCP server ──TCP loopback 127.0.0.1:987
   client's evolving setup.
 
 [LAB-9]: https://linear.app/edmacovaz/issue/LAB-9/repeatable-vw-test-handoff-workflow
+[LAB-8]: https://linear.app/edmacovaz/issue/LAB-8/mcp-can-read-a-documents-classes
 [LAB-6]: https://linear.app/edmacovaz/issue/LAB-6/mcp-round-trip-scaffold
 [LAB-11]: https://linear.app/edmacovaz/issue/LAB-11/no-paste-plugin-install-auto-register-the-vw-menu-command
 
@@ -112,9 +114,10 @@ uv run pytest          # excludes the live-VW checks by default
 
 This is the fast feedback loop a contributor runs on the dev machine (which has no
 Vectorworks). It covers, without VW: MCP tool behaviour via FastMCP's in-memory `Client`
-(`vw_ping` schema + capability flags), the server ↔ in-VW message path (newline-JSON
-framing round trip), a **real loopback transport round trip** (`tcp_companion` ↔ the
-listener's `SocketPump`, with a stubbed `vs`), and the companion's dispatch logic. Lint and
+(`ping` schema + capability flags, the `read_classes` versioned shape via a captured
+fixture), the server ↔ in-VW message path (newline-JSON framing round trip), a **real
+loopback transport round trip** (`tcp_companion` ↔ the listener's `SocketPump`, with a
+stubbed `vs`), and the companion's dispatch logic. Lint and
 format are `uv run ruff check` / `uv run ruff format`. Tooling: **`uv`** (env/deps/runner,
 installed via `brew install uv`), **`pytest`**, **`ruff`** — all *contributor*-side; the
 architect never touches them. Deliberately out of scope for the POC: type checker,

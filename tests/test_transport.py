@@ -69,8 +69,8 @@ def test_tcp_companion_round_trips_against_the_socket_pump():
 
 
 def test_unreachable_port_raises_oserror():
-    # Nothing is listening — the host client surfaces an OSError, which vw_ping
-    # turns into a clear "no session reachable" message and the e2e test skips on.
+    # Nothing is listening — the host client surfaces an OSError, which the ping
+    # tool turns into a clear "no session reachable" message and the e2e test skips on.
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
         dead_port = probe.getsockname()[1]  # bound-but-not-listening → refused
